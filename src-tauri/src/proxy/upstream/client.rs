@@ -168,7 +168,7 @@ impl UpstreamClient {
             .pool_idle_timeout(Duration::from_secs(90)) // 空闲连接保持 90 秒
             .tcp_keepalive(Duration::from_secs(60)) // TCP 保活探测 60 秒
             // 强制开启 HTTP/2 协议，并支持在 SOCKS/HTTPS 代理下通过 ALPN 强制降级/协商
-            .timeout(Duration::from_secs(600));
+            .timeout(Duration::from_secs(3600));
 
         builder = Self::apply_default_user_agent(builder);
 
@@ -197,7 +197,7 @@ impl UpstreamClient {
             .pool_max_idle_per_host(20)
             .pool_idle_timeout(Duration::from_secs(90))
             .tcp_keepalive(Duration::from_secs(60))
-            .timeout(Duration::from_secs(600))
+            .timeout(Duration::from_secs(3600))
             .proxy(proxy_config.proxy); // Apply the specific proxy
 
         Self::apply_default_user_agent(builder).build()
