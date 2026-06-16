@@ -15,14 +15,12 @@ impl AccountService {
     pub async fn add_account(&self, refresh_token: &str) -> Result<Account, String> {
         // [FIX #1583] 生成临时 UUID 作为账号上下文，避免传递 None 导致代理选择异常
         let temp_account_id = uuid::Uuid::new_v4().to_string();
-
+        
         // 1. 获取 Token (使用临时 ID 确保代理选择有明确上下文)
-        let token_res =
-            modules::oauth::refresh_access_token(refresh_token, Some(&temp_account_id)).await?;
+        let token_res = modules::oauth::refresh_access_token(refresh_token, Some(&temp_account_id)).await?;
 
         // 2. 获取用户信息
-        let user_info =
-            modules::oauth::get_user_info(&token_res.access_token, Some(&temp_account_id)).await?;
+        let user_info = modules::oauth::get_user_info(&token_res.access_token, Some(&temp_account_id)).await?;
 
         // 3. 获取项目 ID (尝试)
         let project_id = crate::proxy::project_resolver::fetch_project_id(&token_res.access_token)
@@ -37,8 +35,7 @@ impl AccountService {
             Some(user_info.email.clone()),
             project_id,
             None,
-            false, // 个人账号默认不开启 GCP TOS
-            token_res.id_token.clone(),
+            true,
         )
         .with_oauth_client_key(token_res.oauth_client_key.clone());
 
@@ -91,12 +88,8 @@ impl AccountService {
     }
 
     /// 切换账号逻辑
-    pub async fn switch_account(
-        &self,
-        account_id: &str,
-        target_ide: Option<&str>,
-    ) -> Result<(), String> {
-        modules::account::switch_account(account_id, target_ide, &self.integration).await
+    pub async fn switch_account(&self, account_id: &str) -> Result<(), String> {
+        modules::account::switch_account(account_id, &self.integration).await
     }
 
     /// 列表获取
@@ -111,10 +104,7 @@ impl AccountService {
 
     // --- OAuth 逻辑 ---
 
-    pub async fn prepare_oauth_url(
-        &self,
-        oauth_client_key: Option<String>,
-    ) -> Result<String, String> {
+    pub async fn prepare_oauth_url(&self, oauth_client_key: Option<String>) -> Result<String, String> {
         let handle = match &self.integration {
             modules::integration::SystemManager::Desktop(h) => Some(h.clone()),
             modules::integration::SystemManager::Headless => None,
@@ -122,10 +112,7 @@ impl AccountService {
         modules::oauth_server::prepare_oauth_url(handle, oauth_client_key).await
     }
 
-    pub async fn start_oauth_login(
-        &self,
-        oauth_client_key: Option<String>,
-    ) -> Result<Account, String> {
+    pub async fn start_oauth_login(&self, oauth_client_key: Option<String>) -> Result<Account, String> {
         let handle = match &self.integration {
             modules::integration::SystemManager::Desktop(h) => Some(h.clone()),
             modules::integration::SystemManager::Headless => None,
@@ -165,9 +152,8 @@ impl AccountService {
 
         // [FIX #1583] 生成临时 UUID 作为账号上下文
         let temp_account_id = uuid::Uuid::new_v4().to_string();
-
-        let user_info =
-            modules::oauth::get_user_info(&token_res.access_token, Some(&temp_account_id)).await?;
+        
+        let user_info = modules::oauth::get_user_info(&token_res.access_token, Some(&temp_account_id)).await?;
         let project_id = crate::proxy::project_resolver::fetch_project_id(&token_res.access_token)
             .await
             .ok();
@@ -179,8 +165,7 @@ impl AccountService {
             Some(user_info.email.clone()),
             project_id,
             None,
-            false, // 默认不开启，由后续逻辑或用户手动调整
-            token_res.id_token,
+            true,
         )
         .with_oauth_client_key(token_res.oauth_client_key.clone());
 

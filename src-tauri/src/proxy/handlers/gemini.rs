@@ -161,14 +161,7 @@ pub async fn handle_generate(
         // [FIX #765] Pass session_id to wrap_request for signature injection
         // [NEW] 获取完整 Token 对象以注入动态规格 (dynamic > static default > 65535)
         let token_obj = token_manager.get_token_by_id(&account_id);
-        let wrapped_body = wrap_request(
-            &body,
-            &project_id,
-            &mapped_model,
-            Some(account_id.as_str()),
-            Some(&session_id),
-            token_obj.as_ref(),
-        );
+        let wrapped_body = wrap_request(&body, &project_id, &mapped_model, Some(account_id.as_str()), Some(&session_id), token_obj.as_ref());
 
         if debug_logger::is_enabled(&debug_cfg) {
             let payload = json!({
@@ -268,14 +261,6 @@ pub async fn handle_generate(
         // [NEW] 提取实际请求的上游端点 URL，用于日志记录和排查
         let upstream_url = response.url().to_string();
         let status = response.status();
-
-        // [NEW] 提取官方 TraceID
-        let cloud_code_trace_id = response
-            .headers()
-            .get("x-cloudaicompanion-trace-id")
-            .and_then(|h| h.to_str().ok())
-            .map(|s| s.to_string());
-
         if status.is_success() {
             // 6. 响应处理
             if is_stream {
@@ -308,10 +293,8 @@ pub async fn handle_generate(
                 let mut first_chunk = None;
                 let mut retry_gemini = false;
 
-                // [NEW] 实施双阶段超时：第一阶段为 FirstChunkTimeout (300s / 5min)
-                // 这精准对齐了官方 Worker 在模型冷启动（Initialization）阶段的极度耐心
                 match tokio::time::timeout(
-                    std::time::Duration::from_secs(300),
+                    std::time::Duration::from_secs(30),
                     response_stream.next(),
                 )
                 .await
@@ -335,8 +318,8 @@ pub async fn handle_generate(
                         retry_gemini = true;
                     }
                     Err(_) => {
-                        tracing::warn!("[Gemini] First chunk timeout after 300s, retrying...");
-                        last_error = "First chunk timeout".to_string();
+                        tracing::warn!("[Gemini] Timeout waiting for first chunk, retrying...");
+                        last_error = "Timeout".to_string();
                         retry_gemini = true;
                     }
                 }
@@ -349,34 +332,11 @@ pub async fn handle_generate(
                 let model_name_for_stream = mapped_model.clone();
                 let stream = async_stream::stream! {
                     let mut first_data = first_chunk;
-                    let mut meta_sent = false;
-
                     loop {
-                        // [NEW] 阶段 6.2: 补全 __cloudCodeMeta 响应元数据透传
-                        // 官方 Worker 会将 TraceID 作为 SSE 流的第 0 个数据包下发
-                        if !meta_sent {
-                            if let Some(tid) = &cloud_code_trace_id {
-                                let meta_pkg = serde_json::json!({
-                                    "__cloudCodeMeta": {
-                                        "traceId": tid
-                                    }
-                                });
-                                yield Ok::<Bytes, String>(Bytes::from(format!("data: {}\n\n", serde_json::to_string(&meta_pkg).unwrap())));
-                            }
-                            meta_sent = true;
-                        }
-
                         let item = if let Some(fd) = first_data.take() {
                             Some(Ok(fd))
                         } else {
-                            // [NEW] 第二阶段为 StreamIdleTimeout (300s / 5min)
-                            match tokio::time::timeout(std::time::Duration::from_secs(300), response_stream.next()).await {
-                                Ok(next_item) => next_item,
-                                Err(_) => {
-                                    error!("[Gemini-SSE] Idle timeout after 300s, terminating stream");
-                                    None
-                                }
-                            }
+                            response_stream.next().await
                         };
 
                         let bytes = match item {
@@ -607,15 +567,7 @@ pub async fn handle_generate(
         let trace_id = format!("gemini_{}", session_id);
 
         // 执行退避
-        if apply_retry_strategy(
-            strategy.clone(),
-            attempt,
-            max_attempts,
-            status_code,
-            &trace_id,
-        )
-        .await
-        {
+        if apply_retry_strategy(strategy, attempt, max_attempts, status_code, &trace_id).await {
             // [NEW] Apply Client Adapter "let_it_crash" strategy
             if let Some(adapter) = &client_adapter {
                 if adapter.let_it_crash() && attempt > 0 {
@@ -628,17 +580,13 @@ pub async fn handle_generate(
             }
 
             // 判断是否需要轮换账号
-            // 判断是否需要轮换账号
-            let mut force_rotate = false;
-            if !should_rotate_account(status_code, Some(&strategy)) {
+            if !should_rotate_account(status_code) {
                 debug!(
-                "[{}] Keeping same account for status {} (Gemini server-side issue or Grace Retry)",
-                trace_id, status_code
-            );
-                force_rotate = false;
-            } else {
-                force_rotate = true;
+                    "[{}] Keeping same account for status {} (Gemini server-side issue)",
+                    trace_id, status_code
+                );
             }
+            continue;
         }
 
         // [NEW] 处理 400 错误 (Thinking 签名失效)

@@ -7,7 +7,7 @@ use tauri::State;
 use tokio::sync::RwLock;
 use tokio::time::Duration;
 
-/// 反代服务状态
+/// Reverse generation service status
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ProxyStatus {
     pub running: bool,
@@ -16,13 +16,13 @@ pub struct ProxyStatus {
     pub active_accounts: usize,
 }
 
-/// 反代服务全局状态
+/// Reverse service global status
 #[derive(Clone)]
 pub struct ProxyServiceState {
     pub instance: Arc<RwLock<Option<ProxyServiceInstance>>>,
     pub monitor: Arc<RwLock<Option<Arc<ProxyMonitor>>>>,
-    pub admin_server: Arc<RwLock<Option<AdminServerInstance>>>, // [NEW] 常驻管理服务器
-    pub starting: Arc<AtomicBool>, // [NEW] 标识是否正在启动中，防止死锁
+    pub admin_server: Arc<RwLock<Option<AdminServerInstance>>>, // [NEW] Resident management server
+    pub starting: Arc<AtomicBool>, // [NEW] Identifies whether it is starting to prevent deadlock
 }
 
 pub struct AdminServerInstance {
@@ -466,7 +466,7 @@ pub fn generate_api_key() -> String {
     format!("sk-{}", uuid::Uuid::new_v4().simple())
 }
 
-/// 重新加载账号（当主应用添加/删除账号时调用）
+/// Reload the account (called when the main application adds/delete an account)
 #[tauri::command]
 pub async fn reload_proxy_accounts(state: State<'_, ProxyServiceState>) -> Result<usize, String> {
     let instance_lock = state.instance.read().await;

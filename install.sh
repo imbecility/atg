@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Antigravity Tools Install Script (Linux + macOS)
-# Usage: curl -fsSL https://raw.githubusercontent.com/lbjlaq/Antigravity-Manager/main/install.sh | bash
+# Usage: curl -fsSL https://raw.githubusercontent.com/imbecility/atg/main/install.sh | bash
 #
 # Environment variables:
 #   VERSION     - Install specific version (e.g., "4.1.20"), default: latest
@@ -15,7 +15,7 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
-REPO="lbjlaq/Antigravity-Manager"
+REPO="imbecility/atg"
 APP_NAME="Antigravity Tools"
 APP_ID="com.lbjlaq.antigravity-tools"
 GITHUB_API="https://api.github.com/repos/${REPO}/releases"
@@ -43,7 +43,7 @@ Usage:
     curl -fsSL https://raw.githubusercontent.com/${REPO}/main/install.sh | bash
 
     # Install specific version
-    curl -fsSL https://raw.githubusercontent.com/${REPO}/main/install.sh | VERSION=4.2.3 bash
+    curl -fsSL https://raw.githubusercontent.com/${REPO}/main/install.sh | VERSION=4.1.31 bash
 
 Options:
     --help      Show this help message
@@ -151,17 +151,17 @@ build_download_url() {
         linux)
             case "$PKG_EXT" in
                 deb)
-                    # Antigravity.Tools_4.2.3_amd64.deb or _arm64.deb
+                    # Antigravity.Tools_4.1.31_amd64.deb or _arm64.deb
                     DOWNLOAD_URL="${base_url}/Antigravity.Tools_${RELEASE_VERSION}_${DEB_ARCH}.deb"
                     FILENAME="Antigravity.Tools_${RELEASE_VERSION}_${DEB_ARCH}.deb"
                     ;;
                 rpm)
-                    # Antigravity.Tools-4.2.3-1.x86_64.rpm or -1.aarch64.rpm
+                    # Antigravity.Tools-4.1.31-1.x86_64.rpm or -1.aarch64.rpm
                     DOWNLOAD_URL="${base_url}/Antigravity.Tools-${RELEASE_VERSION}-1.${RPM_ARCH}.rpm"
                     FILENAME="Antigravity.Tools-${RELEASE_VERSION}-1.${RPM_ARCH}.rpm"
                     ;;
                 AppImage)
-                    # Antigravity.Tools_4.2.3_amd64.AppImage or _aarch64.AppImage
+                    # Antigravity.Tools_4.1.31_amd64.AppImage or _aarch64.AppImage
                     local appimage_arch
                     if [[ "$ARCH_LABEL" == "x86_64" ]]; then
                         appimage_arch="amd64"

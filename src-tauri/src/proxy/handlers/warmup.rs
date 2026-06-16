@@ -185,14 +185,7 @@ pub async fn handle_warmup(
             })
         };
 
-        wrap_request(
-            &base_request,
-            &project_id,
-            &req.model,
-            None,
-            Some(&session_id),
-            None,
-        ) // [FIX] Added None for token param
+        wrap_request(&base_request, &project_id, &req.model, None, Some(&session_id), None) // [FIX] Added None for token param
     };
 
     // ===== 步骤 3: 调用 UpstreamClient =====
@@ -301,10 +294,7 @@ pub async fn handle_warmup(
                             "[Warmup-API] 403 Forbidden detected for {}, marking account as forbidden",
                             req.email
                         );
-                        let _ = crate::modules::account::mark_account_forbidden(
-                            &resolved_account_id,
-                            &error_text,
-                        );
+                        let _ = crate::modules::account::mark_account_forbidden(&resolved_account_id, &error_text);
                     } else {
                         warn!(
                             "[Warmup-API] 403 Forbidden detected for {} but could not resolve account_id, skipping mark",
@@ -357,7 +347,7 @@ pub async fn handle_warmup(
                     "{{\"type\": \"warmup\", \"model\": \"{}\"}}",
                     req.model
                 )),
-                response_body: Some(e.clone()),
+                response_body: None,
                 input_tokens: None,
                 output_tokens: None,
                 protocol: Some("warmup".to_string()),

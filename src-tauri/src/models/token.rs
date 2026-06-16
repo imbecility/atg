@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 
 fn default_is_gcp_tos() -> bool {
-    false
+    true
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -19,11 +19,9 @@ pub struct TokenData {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub oauth_client_key: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub session_id: Option<String>, // 新增：Antigravity sessionId
+    pub session_id: Option<String>,  // 新增：Antigravity sessionId
     #[serde(default = "default_is_gcp_tos")]
     pub is_gcp_tos: bool,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub id_token: Option<String>,
 }
 
 impl TokenData {
@@ -35,7 +33,6 @@ impl TokenData {
         project_id: Option<String>,
         session_id: Option<String>,
         is_gcp_tos: bool,
-        id_token: Option<String>,
     ) -> Self {
         let expiry_timestamp = chrono::Utc::now().timestamp() + expires_in;
         Self {
@@ -49,7 +46,6 @@ impl TokenData {
             oauth_client_key: None,
             session_id,
             is_gcp_tos,
-            id_token,
         }
     }
 
