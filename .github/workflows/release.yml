@@ -18,6 +18,25 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Determine release tag
+        shell: bash
+        run: |
+          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            TAG="${{ github.ref_name }}"
+            echo "Source: pushed tag"
+          else
+            TAG="v0.0.0-build-${{ github.run_number }}"
+            echo "Source: workflow_dispatch, auto tag = $TAG"
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git tag "$TAG"
+            git push origin "$TAG"
+          fi
+          echo "RELEASE_TAG=$TAG" >> $GITHUB_ENV
+          echo "Final tag: $TAG"
 
       - name: Rust setup
         uses: dtolnay/rust-toolchain@stable
@@ -31,7 +50,7 @@ jobs:
       - name: Install frontend dependencies
         run: npm install --legacy-peer-deps
 
-      - name: Disable updater artifacts (no signing key)
+      - name: Disable updater artifacts
         shell: pwsh
         run: |
           $configPath = "src-tauri/tauri.conf.json"
@@ -47,37 +66,29 @@ jobs:
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path release-files
-          
-          # NSIS installer (.exe) и MSI
-          Get-ChildItem -Recurse -Path "src-tauri/target/release/bundle" -Include "*.exe","*.msi" |
-            Copy-Item -Destination release-files/
-          
-          Write-Host "Files to release:"
+          Get-ChildItem -Recurse -Path "src-tauri/target/release/bundle" -File |
+            Where-Object { $_.Extension -in @(".exe", ".msi") } |
+            ForEach-Object {
+              Write-Host "Copying: $($_.FullName)"
+              Copy-Item $_.FullName -Destination release-files/
+            }
+          Write-Host "`n=== Files to upload ==="
           Get-ChildItem release-files
 
-      - name: Extract Release Notes
-        shell: bash
-        run: |
-          VERSION="${{ github.ref_name }}"
-          awk -v ver="$VERSION" '
-            BEGIN { capture=0 }
-            $0 ~ "^[[:space:]]*[*+-][[:space:]]+\\*\\*" ver { capture=1; next }
-            capture && $0 ~ "^[[:space:]]*[*+-][[:space:]]+\\*\\*v" { capture=0; exit }
-            capture { print }
-          ' README.md | sed 's/^[[:space:]]\{8\}//' > release_notes.md
-
-          if [ ! -s release_notes.md ]; then
-            echo "Windows x64 build for $VERSION" > release_notes.md
-          fi
-
-          cat release_notes.md
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-x64-${{ env.RELEASE_TAG }}
+          path: release-files/*
+          retention-days: 30
 
       - name: Create GitHub Release
         uses: ncipollo/release-action@v1
         with:
           allowUpdates: true
-          name: "${{ github.ref_name }}"
-          bodyFile: "release_notes.md"
+          tag: ${{ env.RELEASE_TAG }}
+          name: "${{ env.RELEASE_TAG }}"
+          body: "Windows x64 build ${{ env.RELEASE_TAG }}"
           token: ${{ secrets.GITHUB_TOKEN }}
           artifacts: "release-files/*"
           artifactErrorsFailBuild: false
